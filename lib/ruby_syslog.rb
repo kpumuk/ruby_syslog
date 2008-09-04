@@ -46,7 +46,7 @@ module RubySyslog
       facility = FACILITIES[facility] if facility.is_a? Symbol
       @facility = facility
       @tag = tag
-      @socket = UDPSocket.new
+      connect
     end
     
     def log(severity, message, time = nil)
@@ -57,13 +57,19 @@ module RubySyslog
       send "<#{@facility * 8 + severity}>#{day} #{time.strftime('%T')} #{hostname} #{@tag}: #{message}"
     end
     
-    def send(data)
-      @socket.connect(@host, 514)
+    def send(data, attempts = 0)
       @socket.send(data, 0)
-    ensure
-      @socket.close rescue nil
+    rescue
+      return nil if (attempts += 1) == 3
+      connect
+      retry
     end
     private :send
+    
+    def connect
+      @socket = UDPSocket.new
+      @socket.connect(@host, 514)
+    end
     
     SEVERITIES.keys.each do |severity|
       define_method severity do |message|
